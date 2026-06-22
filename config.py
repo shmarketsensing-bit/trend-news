@@ -15,12 +15,31 @@ PROMPT_DIR = BASE_DIR / "prompts"
 for d in (DATA_DIR, FAILED_DIR, LOG_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
-# ── API 키 ────────────────────────────────────────
-NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
-NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID", "")
+
+def _secret(name: str, default: str = "") -> str:
+    """키를 두 곳에서 찾는다: ①환경변수/.env ②Streamlit Cloud Secrets.
+
+    로컬에서는 .env(os.environ)를, Streamlit Cloud 배포에서는
+    st.secrets를 읽는다. 둘 중 먼저 발견되는 값을 사용.
+    """
+    val = os.getenv(name, "")
+    if val:
+        return val
+    try:
+        import streamlit as st  # 배포 환경에만 의미 있음
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:
+        pass
+    return default
+
+
+# ── API 키 (.env 또는 Streamlit Secrets) ───────────
+NAVER_CLIENT_ID = _secret("NAVER_CLIENT_ID")
+NAVER_CLIENT_SECRET = _secret("NAVER_CLIENT_SECRET")
+GEMINI_API_KEY = _secret("GEMINI_API_KEY")
+NOTION_API_KEY = _secret("NOTION_API_KEY")
+NOTION_DATABASE_ID = _secret("NOTION_DATABASE_ID")
 
 # ── 모델 (Google AI Studio 무료 티어) ──────────────
 # flash-lite: 무료 한도가 가장 넉넉(분당 15회·하루 1,000회 수준), 분류/요약에 충분
@@ -63,13 +82,16 @@ NOTION_FIELDS = {
     "total":        "트렌드 점수",
     "reason":       "추천 사유",
     "memo":         "담당자 메모",
-    "upload_status": "업로드 상태",
+    "upload_status": "상태",        # Select: 후보 | 선정 | 제외
 }
 # '작성자' 필드 타입: 이 DB는 multi_select 이므로 그렇게 보냄.
 # (만약 작성자를 Text로 만들었다면 "rich_text"로 바꾸세요)
 NOTION_AUTHOR_TYPE = "multi_select"   # "multi_select" | "rich_text"
 # URL 필드 타입: 이 DB가 URL 타입이면 "url", Text면 "rich_text"
 NOTION_URL_TYPE = "url"               # "url" | "rich_text"
+# Actions 자동 업로드 시 확장필드(언론사·점수 등) 포함 여부.
+# DB에 확장 컬럼이 없으면 False로 둔다(필수 필드만 올림).
+NOTION_INCLUDE_EXTENDED = False
 
 # ── 카테고리 & 트렌드 검색어 ───────────────────────
 # 일반 단어("여행") 대신 트렌드 분석 기사가 잡히도록 수식어를 결합한다.

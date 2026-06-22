@@ -43,6 +43,18 @@ def run() -> int:
         saved, run_date, s["api_calls"], s["cache_hits"], s["ai_ok"],
         s["ai_fail"], s["fallback"],
     )
+
+    # 노션에 '후보' 상태로 자동 업로드 (하이브리드: 출근 후 화면에서 큐레이션)
+    if config.NOTION_API_KEY and config.NOTION_DATABASE_ID:
+        from core import notion_client_wrap as notion
+        rows = db.fetch_by_date(run_date)
+        res = notion.upload_many(rows, include_extended=config.NOTION_INCLUDE_EXTENDED,
+                                 status="후보")
+        logger.info("노션 후보 업로드 | 신규 %d·중복 %d·실패 %d",
+                    res["uploaded"], res["duplicate"], res["failed"])
+    else:
+        logger.info("노션 키 없음 → 자동 업로드 생략(로컬 SQLite에만 저장)")
+
     logger.info("===== 수집 배치 종료 =====")
     return 0
 
