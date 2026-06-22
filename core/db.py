@@ -6,6 +6,9 @@ from typing import Optional
 
 import config
 from core.models import AnalyzedArticle
+from core.logger import get_logger
+
+logger = get_logger()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS articles (
@@ -57,9 +60,30 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
 
 
-def save_candidates(articles: list[AnalyzedArticle], run_date: str) -> int:
-    """후보 기사 일괄 저장. UNIQUE 충돌(중복 원문)은 무시. 저장 건수 반환."""
+def clear_run_date(run_date: str) -> int:
+    """해당 run_date의 기존 후보 행을 삭제. 같은 날 재실행 시 누적 방지.
+
+    (노션에 이미 올라간 건은 노션에서 큐레이션되므로 로컬 DB는 매 실행 새로 써도 안전)
+    반환: 삭제된 행 수.
+    """
     init_db()
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM articles WHERE run_date=?", (run_date,))
+        conn.commit()
+        return cur.rowcount
+
+
+def save_candidates(articles: list[AnalyzedArticle], run_date: str,
+                    replace: bool = True) -> int:
+    """후보 기사 일괄 저장. UNIQUE 충돌(중복 원문)은 무시. 저장 건수 반환.
+
+    replace=True면 같은 run_date의 기존 행을 먼저 비운다(재실행 누적 방지).
+    """
+    init_db()
+    if replace:
+        deleted = clear_run_date(run_date)
+        if deleted:
+            logger.info("재실행 감지: %s 기존 %d건 삭제 후 재저장", run_date, deleted)
     saved = 0
     now = datetime.now().isoformat(timespec="seconds")
     with get_conn() as conn:
