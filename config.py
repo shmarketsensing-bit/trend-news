@@ -92,6 +92,8 @@ NOTION_URL_TYPE = "url"               # "url" | "rich_text"
 # Actions 자동 업로드 시 확장필드(언론사·점수 등) 포함 여부.
 # DB에 확장 컬럼이 없으면 False로 둔다(필수 필드만 올림).
 NOTION_INCLUDE_EXTENDED = False
+# '상태' 필드 타입: 노션에서 Status(상태) 타입이면 "status", Select(선택)면 "select"
+NOTION_STATUS_TYPE = "status"         # "status" | "select"
 
 # ── 카테고리 & 트렌드 검색어 ───────────────────────
 # 일반 단어("여행") 대신 트렌드 분석 기사가 잡히도록 수식어를 결합한다.

@@ -18,40 +18,15 @@ def _get_client() -> Client:
 
 
 def url_exists(url: str) -> bool:
-    """동일 URL이 이미 존재하는지. 실패 시 False(업로드는 진행).
-
-    notion-client 버전에 따라 databases.query / databases().query /
-    request() 중 동작하는 방식이 달라, 순서대로 시도한다.
-    """
+    """동일 URL이 이미 존재하는지. 실패 시 False(업로드는 진행)."""
     if not url:
         return False
     url_field = config.NOTION_FIELDS["url"]
     flt = ({"property": url_field, "url": {"equals": url}}
            if config.NOTION_URL_TYPE == "url"
            else {"property": url_field, "rich_text": {"equals": url}})
-    client = _get_client()
-    db_id = config.NOTION_DATABASE_ID
-
-    # 방식 1: databases.query (구버전)
-    try:
-        res = client.databases.query(database_id=db_id, filter=flt, page_size=1)
-        return len(res.get("results", [])) > 0
-    except (AttributeError, TypeError):
-        pass
-    except Exception as e:
-        logger.warning("Notion 중복조회 실패(무시하고 진행): %s", e)
-        return False
-
-    # 방식 2: 범용 request (신버전)
-    try:
-        res = client.request(
-            path=f"databases/{db_id}/query", method="POST",
-            body={"filter": flt, "page_size": 1},
-        )
-        return len(res.get("results", [])) > 0
-    except Exception as e:
-        logger.warning("Notion 중복조회 실패(무시하고 진행): %s", e)
-        return False
+    results = _query_db(flt, page_size=1)
+    return len(results) > 0
 
 
 def _build_properties(row: dict, status: str = "업로드완료") -> dict:
@@ -102,7 +77,10 @@ def _build_properties(row: dict, status: str = "업로드완료") -> dict:
         props[F["reason"]] = {"rich_text": [{"text": {"content": row["reason"][:1900]}}]}
     if row.get("memo"):
         props[F["memo"]] = {"rich_text": [{"text": {"content": row["memo"][:1900]}}]}
-    props[F["upload_status"]] = {"select": {"name": status}}
+    if config.NOTION_STATUS_TYPE == "status":
+        props[F["upload_status"]] = {"status": {"name": status}}
+    else:
+        props[F["upload_status"]] = {"select": {"name": status}}
     return props
 
 
@@ -159,22 +137,20 @@ def _query_db(filter_obj: dict | None = None, page_size: int = 100) -> list[dict
     body = {"page_size": page_size}
     if filter_obj:
         body["filter"] = filter_obj
-    # 방식 1: databases.query
+    # 방식 1: databases.query (정식 메서드)
     try:
         res = client.databases.query(database_id=db_id, **body)
         return res.get("results", [])
-    except (AttributeError, TypeError):
-        pass
-    except Exception as e:
-        logger.warning("Notion 쿼리 실패: %s", e)
-        return []
-    # 방식 2: 범용 request
-    try:
-        res = client.request(path=f"databases/{db_id}/query", method="POST", body=body)
-        return res.get("results", [])
-    except Exception as e:
-        logger.warning("Notion 쿼리 실패: %s", e)
-        return []
+    except Exception as e1:
+        # 방식 2: 범용 request 폴백
+        try:
+            res = client.request(
+                path=f"/v1/databases/{db_id}/query", method="POST", body=body,
+            )
+            return res.get("results", [])
+        except Exception as e2:
+            logger.warning("Notion 쿼리 실패(무시하고 진행): %s / %s", e1, e2)
+            return []
 
 
 def _prop_text(prop: dict) -> str:
@@ -188,6 +164,8 @@ def _prop_text(prop: dict) -> str:
         return "".join(x.get("plain_text", "") for x in prop.get("rich_text", []))
     if t == "select":
         return (prop.get("select") or {}).get("name", "")
+    if t == "status":
+        return (prop.get("status") or {}).get("name", "")
     if t == "url":
         return prop.get("url") or ""
     if t == "number":
@@ -202,7 +180,10 @@ def _prop_text(prop: dict) -> str:
 def fetch_candidates(status: str = "후보") -> list[dict]:
     """노션에서 특정 상태의 기사들을 화면용 dict 리스트로 반환."""
     F = config.NOTION_FIELDS
-    flt = {"property": F["upload_status"], "select": {"equals": status}}
+    if config.NOTION_STATUS_TYPE == "status":
+        flt = {"property": F["upload_status"], "status": {"equals": status}}
+    else:
+        flt = {"property": F["upload_status"], "select": {"equals": status}}
     pages = _query_db(flt)
     out = []
     for pg in pages:
@@ -229,10 +210,14 @@ def fetch_candidates(status: str = "후보") -> list[dict]:
 def set_status(page_id: str, status: str) -> bool:
     """노션 페이지의 '상태' 필드를 변경(후보→선정 등)."""
     F = config.NOTION_FIELDS
+    if config.NOTION_STATUS_TYPE == "status":
+        val = {"status": {"name": status}}
+    else:
+        val = {"select": {"name": status}}
     try:
         _get_client().pages.update(
             page_id=page_id,
-            properties={F["upload_status"]: {"select": {"name": status}}},
+            properties={F["upload_status"]: val},
         )
         return True
     except Exception as e:
