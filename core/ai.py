@@ -107,10 +107,19 @@ def _to_analyzed(a: DedupedArticle, data: dict) -> AnalyzedArticle | None:
         cat = data.get("category", "")
         if cat not in config.CATEGORIES:
             cat = a.category_hint or config.CATEGORIES[0]
+        # comment가 배열이면 불릿 문자열로 정규화(줄바꿈 기준으로 노션에서 분리)
+        raw_comment = data.get("comment", "")
+        if isinstance(raw_comment, list):
+            comment = "\n".join(
+                f"- {str(x).strip().lstrip('-').strip()}"
+                for x in raw_comment if str(x).strip()
+            )
+        else:
+            comment = str(raw_comment)
         return AnalyzedArticle(
             **a.model_dump(),
             category=cat, suggested_category=data.get("suggested_category"),
-            summary=data.get("summary", ""), comment=data.get("comment", ""),
+            summary=data.get("summary", ""), comment=comment,
             implication=data.get("implication", ""),
             hashtags=data.get("hashtags", []) or [],
             scores=scores, total=scores.total, reason=data.get("reason", ""),

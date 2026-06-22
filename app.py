@@ -20,7 +20,7 @@ if not (config.NOTION_API_KEY and config.NOTION_DATABASE_ID):
 # ── 후보 불러오기 ─────────────────────────────────
 top = st.columns([2, 1, 3])
 with top[0]:
-    view_status = st.selectbox("보기", ["후보", "선정"], index=0)
+    view_status = st.selectbox("보기", ["후보", "선정", "제외"], index=0)
 with top[1]:
     st.write("")
     st.write("")
@@ -89,10 +89,10 @@ for r in view:
             if notion.set_status(r["page_id"], "선정"):
                 st.toast("선정 → 노션 반영")
                 st.rerun()
-        if btns[1].button("🗑️ 제외(휴지통)", key=f"exc_{r['page_id']}",
-                          use_container_width=True):
-            if notion.archive_page(r["page_id"]):
-                st.toast("노션 휴지통으로 이동")
+        if btns[1].button("🚫 제외", key=f"exc_{r['page_id']}",
+                          use_container_width=True, disabled=r["status"] == "제외"):
+            if notion.set_status(r["page_id"], "제외"):
+                st.toast("제외 → 노션 반영 (삭제 아님, 되돌릴 수 있어요)")
                 st.rerun()
         if btns[2].button("↩️ 후보로", key=f"rst_{r['page_id']}",
                           use_container_width=True, disabled=r["status"] == "후보"):

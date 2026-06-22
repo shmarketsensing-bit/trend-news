@@ -47,7 +47,25 @@ def run() -> int:
     # 노션에 '후보' 상태로 자동 업로드 (하이브리드: 출근 후 화면에서 큐레이션)
     if config.NOTION_API_KEY and config.NOTION_DATABASE_ID:
         from core import notion_client_wrap as notion
+        from core.dedup import _similar
         rows = db.fetch_by_date(run_date)
+
+        # 날짜 간 중복 제거: 최근 노션에 올라간 기사와 제목이 유사하면 업로드 제외
+        # (어제 조선일보로 올라간 동일 사건이 오늘 중앙일보로 다시 잡히는 경우 차단)
+        try:
+            prev = notion.recent_titles(limit=100)
+            kept = []
+            for r in rows:
+                t = r.get("title") or ""
+                if any(_similar(t, pt) >= config.TITLE_SIMILARITY_THRESHOLD for pt in prev):
+                    logger.info("날짜간 중복 제외: %s", t[:40])
+                    continue
+                kept.append(r)
+            logger.info("날짜간 중복제거: %d건 → %d건", len(rows), len(kept))
+            rows = kept
+        except Exception as e:
+            logger.warning("날짜간 중복체크 건너뜀: %s", e)
+
         res = notion.upload_many(rows, include_extended=config.NOTION_INCLUDE_EXTENDED,
                                  status="후보")
         logger.info("노션 후보 업로드 | 신규 %d·중복 %d·실패 %d",
