@@ -227,7 +227,7 @@ def fetch_candidates(status: str = "후보") -> list[dict]:
 
 
 def set_status(page_id: str, status: str) -> bool:
-    """노션 페이지의 '상태' 필드를 변경(후보→선정/제외 등)."""
+    """노션 페이지의 '상태' 필드를 변경(후보→선정 등)."""
     F = config.NOTION_FIELDS
     try:
         _get_client().pages.update(
@@ -237,4 +237,14 @@ def set_status(page_id: str, status: str) -> bool:
         return True
     except Exception as e:
         logger.warning("상태 변경 실패: %s", e)
+        return False
+
+
+def archive_page(page_id: str) -> bool:
+    """노션 페이지를 아카이브(휴지통으로 이동). 30일 내 복구 가능."""
+    try:
+        _get_client().pages.update(page_id=page_id, archived=True)
+        return True
+    except Exception as e:
+        logger.warning("아카이브 실패: %s", e)
         return False
