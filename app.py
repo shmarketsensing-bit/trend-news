@@ -99,4 +99,3 @@ for r in view:
             if notion.set_status(r["page_id"], "후보"):
                 st.toast("후보로 되돌림")
                 st.rerun()
-d
