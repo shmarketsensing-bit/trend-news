@@ -31,9 +31,11 @@ def _heuristic_score(a: DedupedArticle) -> float:
     # 내용 충실도
     score += min(len(a.naver_summary or ""), 300) / 100.0
 
-    # 트렌드 신호: 등장 키워드마다 가산(상한 있음)
+    # 트렌드 신호: 반복·확산·소비행동 변화는 크게, 단발성 새 소식은 작게 반영
     trend_hits = sum(1 for kw in config.TREND_SIGNAL_KEYWORDS if kw in text)
-    score += min(trend_hits, 6) * 3        # 트렌드성을 가장 크게 반영
+    weak_novelty_hits = sum(1 for kw in config.WEAK_NOVELTY_KEYWORDS if kw in text)
+    score += min(trend_hits, 6) * 3
+    score += min(weak_novelty_hits, 2) * 1
 
     # 노이즈 신호: 단발성·비트렌드 기사 감점
     noise_hits = sum(1 for kw in config.NOISE_KEYWORDS if kw in text)
