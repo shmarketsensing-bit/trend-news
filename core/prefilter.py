@@ -22,10 +22,7 @@ def _heuristic_score(a: DedupedArticle) -> float:
     text = f"{a.title} {a.naver_summary}"
 
     # 우선 언론사 (앞순위일수록 높게)
-    for i, p in enumerate(config.PRIORITY_PRESS):
-        if p in (a.press or ""):
-            score += (len(config.PRIORITY_PRESS) - i) * 2
-            break
+    score += config.priority_press_weight(a.press or "") * 2
     # 본문 추출 성공
     if a.body_source == "origin":
         score += 5

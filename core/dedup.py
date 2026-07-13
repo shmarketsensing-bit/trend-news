@@ -42,10 +42,7 @@ def _similar(a: str, b: str) -> float:
 
 def _priority_rank(press: str) -> int:
     """우선 언론사일수록 낮은 값(우선). 가중치 용도."""
-    for i, p in enumerate(config.PRIORITY_PRESS):
-        if p in (press or ""):
-            return i
-    return len(config.PRIORITY_PRESS)
+    return config.priority_press_rank(press)
 
 
 def _pick_representative(cluster: list[RawArticle]) -> RawArticle:

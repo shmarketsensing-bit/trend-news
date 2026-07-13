@@ -143,10 +143,8 @@ def _fallback(a: DedupedArticle) -> AnalyzedArticle:
     summary = (a.naver_summary or a.title)[:300]
     # 간단 규칙 점수: 우선언론사/이슈성으로 trend·business 근사
     base = 3
-    for p in config.PRIORITY_PRESS:
-        if p in (a.press or ""):
-            base = 4
-            break
+    if config.priority_press_weight(a.press or ""):
+        base = 4
     scores = Scores(trend=base, business=base, novelty=2, spread=2)
     is_ad = _looks_like_ad(f"{a.title} {summary}")
     return AnalyzedArticle(
