@@ -131,10 +131,8 @@ def _to_analyzed(a: DedupedArticle, data: dict) -> AnalyzedArticle | None:
 
 
 def _looks_like_ad(text: str) -> bool:
-    """LLM 없이 쓰는 fallback 경로용 약한 광고성 휴리스틱.
-    광고 신호 키워드가 여러 개 겹치면 보도자료성으로 간주."""
-    hits = sum(1 for kw in config.AD_SIGNAL_KEYWORDS if kw in text)
-    return hits >= config.AD_SIGNAL_THRESHOLD
+    """LLM 없이 쓰는 fallback 경로용 광고성 휴리스틱."""
+    return config.looks_like_promotional(text)
 
 
 def _fallback(a: DedupedArticle) -> AnalyzedArticle:

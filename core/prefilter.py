@@ -54,6 +54,14 @@ def prefilter(articles: list[DedupedArticle]) -> list[DedupedArticle]:
     except Exception as e:
         logger.warning("기업로드 URL 조회 실패(무시): %s", e)
 
+    before_ads = len(articles)
+    articles = [
+        a for a in articles
+        if not config.looks_like_promotional(f"{a.title} {a.naver_summary}")
+    ]
+    if before_ads != len(articles):
+        logger.info("광고성/보도자료성 기사 1차 제외: %d건", before_ads - len(articles))
+
     limit = config.PREFILTER_LIMIT
     if len(articles) <= limit:
         return articles

@@ -146,6 +146,7 @@ def priority_press_weight(press: str) -> int:
 # 제목 문자열 유사도 또는 토큰 자카드 중 하나라도 이 값 이상이면 동일 이슈로 묶음.
 # 0.55: 언론사만 다르고 표현이 살짝 바뀐 동일 사건까지 잡되, 다른 주제는 분리.
 TITLE_SIMILARITY_THRESHOLD = 0.55
+CONTENT_SIMILARITY_THRESHOLD = 0.42
 
 # ── 트렌드 신호 (prefilter 가중치용) ────────────────
 # 제목/요약에 등장하면 트렌드성이 높다고 보고 가산점
@@ -160,15 +161,27 @@ TREND_SIGNAL_KEYWORDS = [
     # 기술 신호
     "AI", "인공지능", "생성형", "에이전트", "자동화", "디지털", "앱",
 ]
-# 기업 광고성(보도자료성) 기사 신호(fallback 전용 약한 휴리스틱).
-# LLM 분석 경로는 프롬프트의 is_ad 판단을 우선 사용하고, 이 목록은
-# LLM 호출 없이 규칙만으로 후보를 만드는 fallback 경로에서만 참고한다.
-AD_SIGNAL_KEYWORDS = [
+# 기업 광고성(보도자료성) 기사 신호.
+# 1차 필터에서 명백한 할인/이벤트성 기사를 줄이고, LLM/fallback에서도 재사용한다.
+AD_STRONG_SIGNAL_KEYWORDS = [
     "할인 행사", "할인행사", "이벤트를 진행", "프로모션을 진행", "쿠폰 증정",
-    "출시했다고 밝혔다", "선보인다고 밝혔다", "관계자는", "라고 밝혔다",
     "기념 이벤트", "특가", "사은품", "경품",
 ]
+AD_SIGNAL_KEYWORDS = [
+    "출시했다고 밝혔다", "선보인다고 밝혔다", "출시한다고 밝혔다", "선보인다고",
+    "관계자는", "라고 밝혔다", "프로모션", "이벤트", "증정",
+    "혜택을 제공", "참여 고객", "고객 대상", "판매한다", "오픈했다",
+]
 AD_SIGNAL_THRESHOLD = 2   # 위 키워드가 이 개수 이상 겹치면 광고성으로 간주
+
+
+def looks_like_promotional(text: str) -> bool:
+    """기업 할인/이벤트/보도자료성 문구가 강하면 광고성 기사로 본다."""
+    normalized = text or ""
+    if any(kw in normalized for kw in AD_STRONG_SIGNAL_KEYWORDS):
+        return True
+    hits = sum(1 for kw in AD_SIGNAL_KEYWORDS if kw in normalized)
+    return hits >= AD_SIGNAL_THRESHOLD
 
 # 제목/요약에 등장하면 트렌드와 무관한 단발성 기사로 보고 감점
 NOISE_KEYWORDS = [

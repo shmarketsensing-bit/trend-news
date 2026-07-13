@@ -40,6 +40,15 @@ def _similar(a: str, b: str) -> float:
     return max(seq, _token_overlap(a, b))
 
 
+def _article_similar(a: RawArticle, b: RawArticle) -> bool:
+    """제목 또는 제목+요약이 비슷하면 같은 이슈로 묶는다."""
+    if _similar(a.title, b.title) >= config.TITLE_SIMILARITY_THRESHOLD:
+        return True
+    a_text = f"{a.title} {a.naver_summary}"
+    b_text = f"{b.title} {b.naver_summary}"
+    return _similar(a_text, b_text) >= config.CONTENT_SIMILARITY_THRESHOLD
+
+
 def _priority_rank(press: str) -> int:
     """우선 언론사일수록 낮은 값(우선). 가중치 용도."""
     return config.priority_press_rank(press)
@@ -67,8 +76,7 @@ def deduplicate(articles: list[RawArticle]) -> list[DedupedArticle]:
     for art in articles:
         placed = False
         for cl in clusters:
-            if any(_similar(art.title, m.title) >= config.TITLE_SIMILARITY_THRESHOLD
-                   for m in cl):
+            if any(_article_similar(art, m) for m in cl):
                 cl.append(art)
                 placed = True
                 break
