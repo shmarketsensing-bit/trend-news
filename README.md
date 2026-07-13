@@ -1,13 +1,12 @@
 # 트렌드 뉴스 수집 자동화 (로컬 MVP)
 
-카드사 마켓센싱용 — 매일 08:00 네이버 뉴스 수집 → 중복제거 → 1차 필터(60건) → Gemini 분석/점수화 → 후보 10개 → 담당자 큐레이션 → Notion 업로드.
+카드사 마켓센싱용 — 매일 08:00 네이버 뉴스 수집 → 중복제거 → 1차 필터(60건) → Gemini 분석/점수화 → 후보 10개 → Notion 업로드(상태=후보) → 노션에서 직접 검토.
 
 ## 구조
 
 ```
 trend-news/
-├── run_collect.py    # 08:00 배치 (수집~저장)
-├── app.py            # Streamlit 큐레이션 화면
+├── run_collect.py    # 08:00 배치 (수집~노션 업로드)
 ├── config.py         # 키워드/카테고리/임계값
 ├── core/             # collector·dedup·extractor·ai·ranker·db·notion·models·logger
 ├── prompts/analyze.txt
@@ -38,17 +37,16 @@ cp .env.example .env     # 키 입력
 관련 뉴스 URL(URL), 해시태그(Multi-select), 작성자(Text)
 
 **확장(선택)**: 언론사·발행일시·수집일시·트렌드 점수·추천 사유·담당자 메모·업로드 상태
-→ 확장 필드를 안 만들었다면 화면 사이드바에서 **"Notion 확장 필드 포함" 체크 해제**.
+→ 확장 필드를 안 만들었다면 `config.py`의 `NOTION_INCLUDE_EXTENDED = False`로 둔다.
 
 ## 4. 실행
 
 ```bash
-# 수동 1회 수집
+# 수동 1회 수집 → 노션에 "후보" 상태로 업로드
 python run_collect.py
-
-# 큐레이션 화면
-streamlit run app.py
 ```
+
+업로드된 기사는 노션 DB의 **상태** 컬럼(후보/선정/제외)을 직접 바꿔가며 검토한다.
 
 ## 5. 매일 08:00 자동화
 
@@ -61,7 +59,7 @@ streamlit run app.py
 - 트리거: 매일 08:00
 - 동작: 프로그램 `…\.venv\Scripts\python.exe`, 인수 `run_collect.py`, 시작 위치 `…\trend-news`
 
-> 08:00 실행 실패 시 → 화면의 **[지금 재수집]** 버튼으로 수동 재실행.
+> 08:00 실행 실패 시 → `python run_collect.py`로 수동 재실행.
 
 ## 6. 운영 메모
 

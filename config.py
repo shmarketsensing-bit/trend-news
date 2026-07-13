@@ -17,21 +17,8 @@ for d in (DATA_DIR, FAILED_DIR, LOG_DIR):
 
 
 def _secret(name: str, default: str = "") -> str:
-    """키를 두 곳에서 찾는다: ①환경변수/.env ②Streamlit Cloud Secrets.
-
-    로컬에서는 .env(os.environ)를, Streamlit Cloud 배포에서는
-    st.secrets를 읽는다. 둘 중 먼저 발견되는 값을 사용.
-    """
-    val = os.getenv(name, "")
-    if val:
-        return val
-    try:
-        import streamlit as st  # 배포 환경에만 의미 있음
-        if name in st.secrets:
-            return str(st.secrets[name])
-    except Exception:
-        pass
-    return default
+    """환경변수/.env에서 키를 찾는다."""
+    return os.getenv(name, default)
 
 
 # ── API 키 (.env 또는 Streamlit Secrets) ───────────
@@ -132,6 +119,16 @@ TREND_SIGNAL_KEYWORDS = [
     # 기술 신호
     "AI", "인공지능", "생성형", "에이전트", "자동화", "디지털", "앱",
 ]
+# 기업 광고성(보도자료성) 기사 신호(fallback 전용 약한 휴리스틱).
+# LLM 분석 경로는 프롬프트의 is_ad 판단을 우선 사용하고, 이 목록은
+# LLM 호출 없이 규칙만으로 후보를 만드는 fallback 경로에서만 참고한다.
+AD_SIGNAL_KEYWORDS = [
+    "할인 행사", "할인행사", "이벤트를 진행", "프로모션을 진행", "쿠폰 증정",
+    "출시했다고 밝혔다", "선보인다고 밝혔다", "관계자는", "라고 밝혔다",
+    "기념 이벤트", "특가", "사은품", "경품",
+]
+AD_SIGNAL_THRESHOLD = 2   # 위 키워드가 이 개수 이상 겹치면 광고성으로 간주
+
 # 제목/요약에 등장하면 트렌드와 무관한 단발성 기사로 보고 감점
 NOISE_KEYWORDS = [
     "부고", "인사", "동정", "별세", "장례", "주가", "코스피", "코스닥",

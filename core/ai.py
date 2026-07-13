@@ -123,10 +123,18 @@ def _to_analyzed(a: DedupedArticle, data: dict) -> AnalyzedArticle | None:
             implication=data.get("implication", ""),
             hashtags=data.get("hashtags", []) or [],
             scores=scores, total=scores.total, reason=data.get("reason", ""),
+            is_ad=bool(data.get("is_ad", False)),
         )
     except (ValueError, TypeError) as e:
         logger.warning("배치 항목 파싱 오류: %s", e)
         return None
+
+
+def _looks_like_ad(text: str) -> bool:
+    """LLM 없이 쓰는 fallback 경로용 약한 광고성 휴리스틱.
+    광고 신호 키워드가 여러 개 겹치면 보도자료성으로 간주."""
+    hits = sum(1 for kw in config.AD_SIGNAL_KEYWORDS if kw in text)
+    return hits >= config.AD_SIGNAL_THRESHOLD
 
 
 def _fallback(a: DedupedArticle) -> AnalyzedArticle:
@@ -140,6 +148,7 @@ def _fallback(a: DedupedArticle) -> AnalyzedArticle:
             base = 4
             break
     scores = Scores(trend=base, business=base, novelty=2, spread=2)
+    is_ad = _looks_like_ad(f"{a.title} {summary}")
     return AnalyzedArticle(
         **a.model_dump(),
         category=a.category_hint or config.CATEGORIES[0],
@@ -149,6 +158,7 @@ def _fallback(a: DedupedArticle) -> AnalyzedArticle:
         hashtags=[],
         scores=scores, total=scores.total,
         reason="AI 분석 미적용(할당량/실패) — 규칙 기반 fallback 후보",
+        is_ad=is_ad,
     )
 
 

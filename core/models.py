@@ -47,6 +47,7 @@ class AnalyzedArticle(DedupedArticle):
     scores: Scores = Field(default_factory=Scores)
     total: int = 0
     reason: str = ""
+    is_ad: bool = False   # True면 기업 광고성/보도자료성 기사 → 후보 선정에서 제외
 
 
 class NotionPayload(BaseModel):

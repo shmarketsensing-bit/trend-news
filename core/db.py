@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS articles (
     score_spread INTEGER,
     total INTEGER,
     reason TEXT,
+    is_ad INTEGER DEFAULT 0,
     status TEXT DEFAULT '후보',
     memo TEXT DEFAULT '',
     author TEXT DEFAULT 'Claude',
@@ -55,9 +56,18 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """이미 존재하는 news.db에 새 컬럼을 안전하게 추가한다(있으면 건너뜀)."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(articles)")}
+    if "is_ad" not in cols:
+        conn.execute("ALTER TABLE articles ADD COLUMN is_ad INTEGER DEFAULT 0")
+
+
 def init_db() -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
+        conn.commit()
 
 
 def clear_run_date(run_date: str) -> int:
@@ -95,8 +105,8 @@ def save_candidates(articles: list[AnalyzedArticle], run_date: str,
                      title, press, published_at, collected_at, naver_url, origin_url,
                      body_source, summary, comment, implication, hashtags,
                      score_trend, score_business, score_novelty, score_spread,
-                     total, reason, status, author)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                     total, reason, is_ad, status, author)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         run_date, a.cluster_id, a.duplicate_count, a.category,
                         a.suggested_category, a.title, a.press,
@@ -105,7 +115,7 @@ def save_candidates(articles: list[AnalyzedArticle], run_date: str,
                         a.summary, a.comment, a.implication,
                         json.dumps(a.hashtags, ensure_ascii=False),
                         a.scores.trend, a.scores.business, a.scores.novelty,
-                        a.scores.spread, a.total, a.reason,
+                        a.scores.spread, a.total, a.reason, int(a.is_ad),
                         "후보", config.DEFAULT_AUTHOR,
                     ),
                 )

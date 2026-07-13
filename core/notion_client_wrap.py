@@ -68,17 +68,19 @@ def _build_properties(row: dict, status: str = "업로드완료") -> dict:
     else:
         url_prop = {"rich_text": [{"text": {"content": url}}]}
 
-    # 요약 property: 표(table) 뷰에서 잘 보이도록 한 줄로 압축(불릿은 페이지 본문에).
+    # 요약 property: 불릿마다 실제 줄바꿈(\n)을 유지해 표에서도 여러 줄로 보이게 한다.
+    # (Notion은 rich_text 안의 \n을 셀 안 줄바꿈으로 렌더링한다. 행 높이를 "자동"으로
+    #  두면 여러 줄이 그대로 보인다.)
     comment_raw = row.get("comment") or ""
-    comment_oneline = " · ".join(
-        ln.strip().lstrip("-").strip()
+    comment_lines = "\n".join(
+        "- " + ln.strip().lstrip("-").strip()
         for ln in comment_raw.splitlines() if ln.strip()
     ) or comment_raw
 
     props: dict = {
         F["title"]: {"title": [{"text": {"content": (row.get("title") or "")[:200]}}]},
         F["category"]: {"select": {"name": row.get("category") or "기타"}},
-        F["comment"]: {"rich_text": [{"text": {"content": comment_oneline[:1900]}}]},
+        F["comment"]: {"rich_text": [{"text": {"content": comment_lines[:1900]}}]},
         F["url"]: url_prop,
         F["hashtags"]: {"multi_select": [{"name": t[:100]} for t in tags[:10]]},
         F["author"]: author_prop,

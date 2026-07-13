@@ -18,6 +18,13 @@ def select_candidates(articles: list[AnalyzedArticle]) -> list[AnalyzedArticle]:
         # 총점(동일가중) 위에, 트렌드성·신규성을 추가 가산해 우선순위를 높임
         return a.total + s.trend * config.W_TREND + s.novelty * config.W_NOVELTY
 
+    # 기업 광고성/보도자료성 기사는 후보에서 완전히 제외
+    ads = [a for a in articles if a.is_ad]
+    articles = [a for a in articles if not a.is_ad]
+    if ads:
+        logger.info("광고성 기사 제외: %d건 (%s)",
+                    len(ads), ", ".join(a.title[:20] for a in ads[:5]))
+
     ranked = sorted(articles, key=weighted, reverse=True)
     selected: list[AnalyzedArticle] = []
     cat_count: dict[str, int] = {}
