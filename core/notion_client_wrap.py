@@ -78,7 +78,7 @@ def _build_properties(row: dict, status: str = "업로드완료") -> dict:
     ) or comment_raw
 
     props: dict = {
-        F["title"]: {"title": [{"text": {"content": (row.get("title") or "")[:200]}}]},
+        F["title"]: {"title": [{"text": {"content": (row.get("title") or "")[:1900]}}]},
         F["category"]: {"select": {"name": row.get("category") or "기타"}},
         F["comment"]: {"rich_text": [{"text": {"content": comment_lines[:1900]}}]},
         F["url"]: url_prop,
