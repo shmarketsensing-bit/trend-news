@@ -158,13 +158,16 @@ def upload_many(rows: list[dict], include_extended: bool = True,
 # ════════════════════════════════════════════════════
 #  하이브리드: 노션을 후보 저장소로 사용 (읽기/상태변경)
 # ════════════════════════════════════════════════════
-def _query_db(filter_obj: dict | None = None, page_size: int = 100) -> list[dict]:
+def _query_db(filter_obj: dict | None = None, page_size: int = 100,
+               sorts: list[dict] | None = None) -> list[dict]:
     """DB 쿼리(버전 폴백 포함). 노션 page 객체 리스트 반환."""
     client = _get_client()
     db_id = config.NOTION_DATABASE_ID
     body = {"page_size": page_size}
     if filter_obj:
         body["filter"] = filter_obj
+    if sorts:
+        body["sorts"] = sorts
     # 방식 1: databases.query (정식 메서드)
     try:
         res = client.databases.query(database_id=db_id, **body)
@@ -236,9 +239,18 @@ def fetch_candidates(status: str = "후보") -> list[dict]:
 
 
 def recent_titles(limit: int = 100) -> list[str]:
-    """최근 노션에 올라간 기사 제목들(상태 무관). 날짜 간 중복 비교용."""
+    """최근 노션에 올라간 기사 제목들(상태 무관). 날짜 간 중복 비교용.
+
+    정렬 없이 조회하면 Notion API는 순서를 보장하지 않는다 — DB가 커질수록
+    '최근 limit건'이 아니라 임의의 limit건이 반환되어, 실제로는 며칠 지난
+    글까지밖에 못 보고 최근 재업로드를 놓칠 수 있다. created_time 내림차순을
+    명시해서 항상 '진짜 최근' limit건을 받도록 한다.
+    """
     F = config.NOTION_FIELDS
-    pages = _query_db(None, page_size=limit)
+    pages = _query_db(
+        None, page_size=limit,
+        sorts=[{"timestamp": "created_time", "direction": "descending"}],
+    )
     titles = []
     for pg in pages:
         p = pg.get("properties", {})

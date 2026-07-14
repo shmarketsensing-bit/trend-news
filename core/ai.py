@@ -144,7 +144,12 @@ def _fallback(a: DedupedArticle) -> AnalyzedArticle:
     if config.priority_press_weight(a.press or ""):
         base = 4
     scores = Scores(trend=base, business=base, novelty=2, spread=2)
-    is_ad = _looks_like_ad(f"{a.title} {summary}")
+    # 광고성 판별은 네이버 짧은 요약(naver_summary)만으로는 놓치기 쉬우므로
+    # 본문 추출이 됐다면(body_source=="origin") 본문까지 함께 검사한다.
+    ad_check_text = f"{a.title} {summary}"
+    if a.body_source == "origin" and a.body:
+        ad_check_text += f" {a.body[:500]}"
+    is_ad = _looks_like_ad(ad_check_text)
     return AnalyzedArticle(
         **a.model_dump(),
         category=a.category_hint or config.CATEGORIES[0],
