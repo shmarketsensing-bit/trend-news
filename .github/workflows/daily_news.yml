@@ -1,17 +1,15 @@
-name: Daily Trend News Collection
+name: Daily Trend News Collect
 
 on:
   schedule:
-    # [임시 테스트] KST 11:05 = UTC 02:05 — 스케줄 정상 동작 확인용, 확인 후 08:05로 원복 필요
-    - cron: '5 2 * * *'
+    # 매일 한국시간(KST) 08:00 = UTC 23:00 (전날)
+    - cron: '0 23 * * *'
   workflow_dispatch:   # 수동 실행 버튼도 활성화
 
 jobs:
-  collect-news:
+  collect:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      TZ: Asia/Seoul
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,12 +24,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Show run context
-        run: |
-          echo "UTC now: $(date -u)"
-          echo "KST now: $(date)"
-          python --version
-
       - name: Run collector
         env:
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
@@ -40,13 +32,3 @@ jobs:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: python run_collect.py
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: collect-logs
-          path: |
-            logs/
-            data/failed/
-          if-no-files-found: ignore
