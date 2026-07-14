@@ -1,13 +1,13 @@
-name: Daily Trend News Collect
+name: Daily Trend News Collection
 
 on:
   schedule:
-    # [임시 테스트] KST 10:10 = UTC 01:10 — 스케줄 정상 동작 확인용, 확인 후 08:00로 원복 필요
-    - cron: '10 1 * * *'
+    # [임시 테스트] KST 11:05 = UTC 02:05 — 스케줄 정상 동작 확인용, 확인 후 08:05로 원복 필요
+    - cron: '5 2 * * *'
   workflow_dispatch:   # 수동 실행 버튼도 활성화
 
 jobs:
-  collect:
+  collect-news:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
