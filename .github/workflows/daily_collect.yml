@@ -2,8 +2,8 @@ name: Daily Trend News Collect
 
 on:
   schedule:
-    # 매일 한국시간(KST) 08:00 = UTC 23:00 (전날) — 스케줄 재등록용 갱신
-    - cron: '0 23 * * *'
+    # [임시 테스트] KST 10:10 = UTC 01:10 — 스케줄 정상 동작 확인용, 확인 후 08:00로 원복 필요
+    - cron: '10 1 * * *'
   workflow_dispatch:   # 수동 실행 버튼도 활성화
 
 jobs:
