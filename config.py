@@ -42,6 +42,7 @@ GEMINI_BATCH_MAX_TOKENS = 4000  # 배치 응답은 길어지므로 토큰 상향
 
 # ── 수집 파라미터 ──────────────────────────────────
 COLLECT_WINDOW_HOURS = 24       # 최근 24시간 내 기사만(어제 업로드분과 겹침 방지)
+RECENT_DAYS_DEDUP_WINDOW = 5    # 근시일 중복 제외: 최근 N일 노션 업로드 이력과 비슷하면 사전제외
 NAVER_DISPLAY = 5              # 키워드당 네이버 검색 건수(무료 한도 보호 위해 축소)
 PREFILTER_LIMIT = 15           # AI 분석 대상 최대(10~15). 배치 3회 이내로 제한
 CANDIDATE_COUNT = 10           # 최종 후보 기사 수
@@ -71,6 +72,8 @@ NOTION_FIELDS = {
     "memo":         "담당자 메모",
     "upload_status": "상태",        # Select: 후보 | 선정 | 제외
 }
+# 담당자가 최종 선정 완료로 표시하는 상태값. AI 프롬프트에 few-shot 사례로 학습시킬 때 사용.
+NOTION_LEARNED_STATUS = "선정완료"
 # '작성자' 필드 타입: 이 DB는 multi_select 이므로 그렇게 보냄.
 # (만약 작성자를 Text로 만들었다면 "rich_text"로 바꾸세요)
 NOTION_AUTHOR_TYPE = "multi_select"   # "multi_select" | "rich_text"

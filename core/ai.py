@@ -25,6 +25,19 @@ _PROMPT = (config.PROMPT_DIR / "analyze_batch.txt").read_text(encoding="utf-8")
 _JSON_ARRAY_RE = re.compile(r"\[.*\]", re.DOTALL)
 _last_call = 0.0
 
+
+def _load_selected_examples() -> str:
+    """core/notion_learn.py가 생성한 '선정완료' few-shot 사례 로드(없으면 빈 문자열)."""
+    path = config.PROMPT_DIR / "selected_examples.txt"
+    if path.exists():
+        text = path.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+    return "(아직 선정 사례 없음)"
+
+
+_SELECTED_EXAMPLES = _load_selected_examples()
+
 # 호출 통계(로그용)
 STATS = {"api_calls": 0, "cache_hits": 0, "ai_ok": 0, "ai_fail": 0, "fallback": 0}
 
@@ -66,6 +79,7 @@ def _build_batch_prompt(batch: list[DedupedArticle]) -> str:
     block = "\n\n".join(lines)
     return (_PROMPT
             .replace("{category_list}", ", ".join(config.CATEGORIES))
+            .replace("{selected_examples}", _SELECTED_EXAMPLES)
             .replace("{articles_block}", block))
 
 

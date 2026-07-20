@@ -27,6 +27,25 @@ def run() -> int:
         return 1
 
     deduped = dedup.deduplicate(raw)
+
+    # 근시일(최근 N일) 노션 업로드 이력과 비슷한 기사는 AI 분석 전에 미리 제외
+    # (무료 할당량 절약 + 며칠 전에 이미 다룬 이슈가 다시 후보로 올라오는 것 방지)
+    if config.NOTION_API_KEY and config.NOTION_DATABASE_ID:
+        from core import notion_client_wrap as notion
+        from core.dedup import _similar
+        try:
+            recent = notion.recent_titles_since(config.RECENT_DAYS_DEDUP_WINDOW)
+            before = len(deduped)
+            deduped = [
+                a for a in deduped
+                if not any(_similar(a.title, t) >= config.TITLE_SIMILARITY_THRESHOLD
+                           for t in recent)
+            ]
+            logger.info("근시일(%d일) 중복 사전제외: %d건 → %d건",
+                        config.RECENT_DAYS_DEDUP_WINDOW, before, len(deduped))
+        except Exception as e:
+            logger.warning("근시일 중복 사전체크 건너뜀: %s", e)
+
     shortlisted = prefilter.prefilter(deduped)        # 무료 한도 보호: LLM 전 1차 컷
     enriched = extractor.enrich_bodies(shortlisted)   # 본문추출도 줄어든 대상만
     analyzed = ai.analyze_all(enriched)               # 배치 분석(+캐시/fallback)

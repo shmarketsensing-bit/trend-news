@@ -1,5 +1,5 @@
 """Notion DB 업로드. URL 중복 체크 후 저장."""
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from notion_client import Client
 
@@ -236,6 +236,54 @@ def fetch_candidates(status: str = "후보") -> list[dict]:
             "status": _prop_text(p.get(F["upload_status"], {})),
         })
     return out
+
+
+def _query_db_all(filter_obj: dict | None = None, sorts: list[dict] | None = None,
+                   max_pages: int = 20) -> list[dict]:
+    """페이지네이션을 따라가며 조건에 맞는 모든 행을 반환(최대 max_pages*100건 안전판)."""
+    client = _get_client()
+    db_id = config.NOTION_DATABASE_ID
+    results: list[dict] = []
+    cursor = None
+    for _ in range(max_pages):
+        body = {"page_size": 100}
+        if filter_obj:
+            body["filter"] = filter_obj
+        if sorts:
+            body["sorts"] = sorts
+        if cursor:
+            body["start_cursor"] = cursor
+        try:
+            res = client.databases.query(database_id=db_id, **body)
+        except Exception as e:
+            logger.warning("Notion 페이지네이션 쿼리 실패(무시하고 진행): %s", e)
+            break
+        results.extend(res.get("results", []))
+        if not res.get("has_more"):
+            break
+        cursor = res.get("next_cursor")
+    return results
+
+
+def recent_titles_since(days: int) -> list[str]:
+    """최근 days일 이내 스크랩(업로드)된 노션 기사 제목 전체(상태 무관).
+
+    수집 직후 단계에서 근시일 내 재등장 기사를 AI 분석 전에 걸러내는 용도.
+    '스크랩 날짜'(collected_at) 필드 기준으로 필터링하며, 100건이 넘어도
+    페이지네이션으로 모두 가져온다(recent_titles의 '최근 100건' 방식과 달리
+    기간 내 전건을 보장).
+    """
+    F = config.NOTION_FIELDS
+    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    flt = {"property": F["collected_at"], "date": {"on_or_after": cutoff}}
+    pages = _query_db_all(flt)
+    titles = []
+    for pg in pages:
+        p = pg.get("properties", {})
+        t = _prop_text(p.get(F["title"], {}))
+        if t:
+            titles.append(t)
+    return titles
 
 
 def recent_titles(limit: int = 100) -> list[str]:

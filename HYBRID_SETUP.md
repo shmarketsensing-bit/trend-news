@@ -40,10 +40,23 @@ git push
 노션 DB를 열고 "상태=후보"로 필터링한 뒤, 검토한 기사의 "상태" 값을
 직접 "선정" 또는 "제외"로 바꾼다.
 
+## 6. 선정 사례 학습(선택)
+
+상태를 "선정완료"로 바꾼 기사가 쌓이면, 그 사례를 AI 분석 프롬프트에 few-shot으로
+넣어 비슷한 결의 기사를 더 잘 골라내도록 만들 수 있다.
+
+- `.github/workflows/update_examples.yml`이 매주 일요일 07:00(KST)에 자동 실행되어
+  노션에서 "상태=선정완료" 기사를 모아 `prompts/selected_examples.txt`를 갱신하고 커밋한다.
+- 즉시 반영하려면 Actions 탭 → "Update Selected Examples" → "Run workflow".
+- 로컬에서 직접 돌리려면: `.env`에 NOTION_API_KEY/NOTION_DATABASE_ID 설정 후 `python -m core.notion_learn`.
+- 노션 DB의 "상태" 옵션에 `선정완료`가 없다면 추가하거나, `config.py`의
+  `NOTION_LEARNED_STATUS` 값을 실제 사용 중인 상태명으로 바꾼다.
+
 ## 동작 요약
 
 | 시점 | 주체 | 동작 |
 |------|------|------|
 | 08:00 | GitHub Actions | 수집·분석 → 노션 "후보" 10개 |
-| 09:00 | 나 (노션) | 후보 검토 → "선정"/"제외"로 상태 변경 |
-| 이후 | 노션 | "선정"만 모아 활용 |
+| 09:00 | 나 (노션) | 후보 검토 → "선정완료"/"제외"로 상태 변경 |
+| 매주 일요일 07:00 | GitHub Actions | "선정완료" 기사 학습 → AI 프롬프트 예시 갱신 |
+| 이후 | 노션 | "선정완료"만 모아 활용 |
