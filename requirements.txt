@@ -1,5 +1,7 @@
 google-genai>=1.0
-notion-client>=2.2
+# 2.6.0부터 databases.query()가 제거되고 data_sources 기반 API로 바뀌어(core/notion_client_wrap.py는
+# 구 방식을 씀) 호환이 깨진다. GitHub Actions는 매번 새로 설치하므로 상한을 반드시 고정해야 한다.
+notion-client>=2.2,<2.6
 trafilatura>=1.12
 requests>=2.32
 python-dotenv>=1.0
