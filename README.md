@@ -7,7 +7,10 @@ Gemini 분석/점수화 → 후보 10개 → Notion 업로드(상태=후보) →
 
 ```
 trend-news/
-├── run_collect.py         # 08:00 배치 (수집~노션 업로드)
+├── .github/workflows/     # GitHub Actions 자동화(실제 운영 스케줄러)
+│   ├── daily_news.yml         # 매일 08:07(KST) run_collect.py
+│   └── update_examples.yml    # 매주 일요일 07:00(KST) core.notion_learn + git 커밋
+├── run_collect.py         # 일일 배치 (수집~노션 업로드)
 ├── config.py              # 키워드/카테고리/임계값
 ├── core/
 │   ├── collector.py       # 네이버 뉴스 검색 수집
@@ -18,7 +21,8 @@ trend-news/
 │   ├── ranker.py          # 최종 후보 선정(카테고리 분산·가중치 정렬)
 │   ├── db.py              # SQLite 저장/캐시
 │   ├── notion_client_wrap.py  # Notion 업로드/조회
-│   ├── notion_learn.py    # "선정완료" 기사로 few-shot 예시 생성(매 배치 끝에 자동 실행)
+│   ├── notion_learn.py    # "선정완료" 기사로 few-shot 예시 생성(주 1회 별도 워크플로우가 자동 실행)
+│   ├── kosis_publications.py  # KOSIS 온라인간행물 신규 발간 추적(자동 실행 안 함 — 수동 실행)
 │   ├── models.py
 │   └── logger.py
 ├── prompts/analyze.txt
@@ -65,20 +69,37 @@ python run_collect.py
 
 업로드된 기사는 노션 DB의 **상태** 컬럼(후보/선정/제외)을 직접 바꿔가며 검토한다.
 
-**few-shot 학습 갱신(자동)**: 담당자가 노션에서 상태를 `config.NOTION_LEARNED_STATUS`
-(기본 "선정완료")로 바꿔둔 기사들을 `run_collect.py`가 매 배치 끝에 자동으로 모아
-`prompts/selected_examples.txt`를 갱신한다(`core/notion_learn.py`). 이후 Gemini 분석이
-"실제로 우리가 고른 기사" 예시를 참고하게 된다.
+**few-shot 학습 갱신(자동, 주 1회)**: 담당자가 노션에서 상태를 `config.NOTION_LEARNED_STATUS`
+(기본 "선정완료")로 바꿔둔 기사들을 `.github/workflows/update_examples.yml`이 **매주 일요일
+07:00(KST)**에 모아 `prompts/selected_examples.txt`를 갱신하고 git에 커밋한다
+(`core/notion_learn.py`). 이후 Gemini 분석이 "실제로 우리가 고른 기사" 예시를 참고하게 된다.
 
-`core/ai.py`는 프로세스가 시작될 때 이 파일을 한 번만 읽어 들이므로, **오늘 갱신한 내용은
-오늘 분석에는 반영되지 않고 다음 배치(내일 08:00)부터 반영**된다 — 정상 동작이다. 갱신을
-직접 실행해서 확인하고 싶으면 아래처럼 단독으로 돌릴 수도 있다.
+이 작업은 파일을 갱신하고 **git에 커밋까지 해야** 다음 배치에 반영되므로(GitHub Actions는
+실행마다 새로 체크아웃하는 일회성 환경이라, 커밋 없이 파일만 써두면 실행 종료와 함께
+사라진다) 매일 배치(`run_collect.py`)가 아니라 별도 워크플로우로 분리되어 있다. 갱신을
+직접 실행해서 확인하고 싶으면 아래처럼 단독으로 돌릴 수도 있다(로컬 실행 시에는 별도로
+git commit/push까지 직접 해야 반영된다).
 
 ```bash
 python -m core.notion_learn
 ```
 
-## 5. 매일 08:00 자동화
+## 5. 자동화
+
+**실제 운영 중인 자동화는 GitHub Actions다**(`.github/workflows/`) — 로컬 PC가 꺼져 있어도 돈다.
+
+| 워크플로우 | 주기 | 하는 일 |
+|---|---|---|
+| `daily_news.yml` | 매일 08:07(KST) | `run_collect.py` — 뉴스 수집~노션 후보 업로드 |
+| `update_examples.yml` | 매주 일요일 07:00(KST) | `core.notion_learn` — 선정완료 few-shot 예시 갱신 + git 커밋 |
+
+두 워크플로우 모두 GitHub 저장소 Settings → Secrets에 `NAVER_CLIENT_ID`/`NAVER_CLIENT_SECRET`/
+`GEMINI_API_KEY`/`NOTION_API_KEY`/`NOTION_DATABASE_ID`가 등록돼 있어야 하고(워크플로우별로
+실제 쓰는 키만 주입됨), Actions 탭에서 `workflow_dispatch`로 수동 실행도 가능하다.
+
+> `core/kosis_publications.py`(아래 5-1)는 별도 워크플로우 없이 **수동 실행 전용**이다(보류 중).
+
+로컬 PC에서 직접 스케줄링하고 싶다면(권장하지 않음 — PC가 꺼져 있으면 안 돌아감):
 
 **macOS / Linux** (`crontab -e`):
 ```
@@ -89,7 +110,29 @@ python -m core.notion_learn
 - 트리거: 매일 08:00
 - 동작: 프로그램 `…\.venv\Scripts\python.exe`, 인수 `run_collect.py`, 시작 위치 `…\trend-news`
 
-> 08:00 실행 실패 시 → `python run_collect.py`로 수동 재실행.
+> 자동 실행 실패 시 → 해당 스크립트를 수동 재실행(`python run_collect.py` 등)하거나 Actions
+> 탭에서 재실행(Re-run) 하면 된다.
+
+## 5-1. KOSIS 온라인간행물 수집 (`core/kosis_publications.py`, 자동 실행 보류·수동 전용)
+
+국가통계포털(KOSIS)의 "온라인간행물" 전체 카탈로그(94개 시리즈, 16개 테마)를 스캔해서,
+`MIN_YEAR`(기본 2025) 이후 발간된 신규 항목만 노션에 "통계간행물" 카테고리로 업로드한다.
+**자동 실행 워크플로우는 만들지 않기로 함(보류)** — 필요할 때 아래 명령으로 수동 실행한다.
+
+- PDF 본문은 파싱하지 않는다 — 제목은 KOSIS가 제공하는 원래 발간본 이름(`korName`, 분기/계절/월
+  등 세부 구분이 이미 포함돼 있음)을 그대로 쓰고, 시리즈명이 안 들어있으면 앞에 붙인다. "이런 신규
+  통계가 나왔다"는 걸 담당자가 캐치하는 용도다(뉴스처럼 AI가 본문을 요약하지 않음).
+  - PDF 본문 AI 요약은 검토해봤으나 보류: 실제 파일 다운로드 테스트 결과 100MB대 대용량 PDF가
+    흔하고(GitHub Actions 15분 타임아웃 부담), 스캔본은 텍스트 추출이 0글자, 텍스트가 있어도
+    비표준 폰트 인코딩으로 깨진 글자가 섞여 나와 요약 신뢰도를 담보하기 어려움. 필요해지면
+    "용량 작은 것만 선별" 등으로 스코프를 좁혀 재검토.
+- 시리즈마다 내부 구조가 달라서(연도당 PDF 1개인 단순한 시리즈도 있고, 연도→분기→통계표까지
+  여러 단계로 쪼개진 시리즈도 있음), 일부 항목은 특정 파일로 바로 연결되는 링크 대신 KOSIS
+  온라인간행물 목록 페이지로만 연결된다.
+- **비공식(내부용) API를 쓴다** — `chapList.do`/`downSrvcFile.do` 모두 KOSIS가 공식 문서화한
+  API가 아니라 웹페이지가 내부적으로 쓰는 엔드포인트라, 예고 없이 바뀌거나 막힐 수 있다.
+
+단독 실행: `python -m core.kosis_publications`
 
 ## 6. 운영 메모
 

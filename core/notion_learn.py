@@ -1,11 +1,13 @@
 """Notion에서 '선정완료' 기사를 가져와 AI 프롬프트용 few-shot 예시를 생성.
 
-run_collect.py가 매 배치(매일 08:00) 끝에 main()을 자동으로 호출해
-prompts/selected_examples.txt 를 최신 상태로 갱신한다.
+.github/workflows/update_examples.yml이 매주 일요일 07:00(KST)에 main()을 호출해
+prompts/selected_examples.txt 를 갱신하고 git에 커밋한다(run_collect.py의 일일 배치와는
+분리된 별도 워크플로우 — 파일을 갱신만 하고 커밋을 안 하면 GitHub Actions의 일회성
+체크아웃 환경 특성상 실행 종료와 함께 그 갱신이 사라지기 때문).
 core/ai.py는 모듈 로드(프로세스 시작) 시점에 이 파일을 한 번만 읽어 분석 프롬프트에
 주입하므로, 갱신 내용은 다음 배치부터 반영된다.
 
-단독 실행도 가능하다: python -m core.notion_learn
+단독 실행도 가능하다: python -m core.notion_learn (로컬 실행 시 git commit/push는 직접 해야 함)
 """
 import config
 from core import notion_client_wrap as notion

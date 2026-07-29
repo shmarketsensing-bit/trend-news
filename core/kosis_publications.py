@@ -4,9 +4,9 @@
 chapList.do를 호출해 최신 발간본을 확인한다. 비공식(내부용) API라 예고 없이
 바뀔 수 있다는 점을 감안해야 한다.
 
-PDF 본문은 파싱하지 않는다 — "시리즈명_연도" 형태의 식별자만 노션에 등록해
-"이런 신규 통계 간행물이 나왔다"는 걸 담당자가 캐치하고 필요하면 직접 열어보게
-하는 용도다(뉴스처럼 AI가 본문을 요약하지 않음).
+PDF 본문은 파싱하지 않는다 — KOSIS가 제공하는 발간본 원래 이름(분기/계절/월 등
+세부 구분 포함)만 식별자로 노션에 등록해 "이런 신규 통계 간행물이 나왔다"는 걸
+담당자가 캐치하고 필요하면 직접 열어보게 하는 용도다(뉴스처럼 AI가 본문을 요약하지 않음).
 
 각 pubcode의 chapList는 트리 구조다(lvl=0이 보통 "연도" 단위, 그 아래 분기/표별로
 더 잘게 쪼개짐 — 예: 가축동향은 연도 밑에 분기, 그 밑에 축종별 통계표까지 내려감).
@@ -75,9 +75,11 @@ def _extract_year(kor_name: str) -> int | None:
     return max(years) if years else None
 
 
-def _download_url(pubcode: str, seq, form_id: str, form_srvc_type: str | None) -> str:
+def _download_url(pubcode: str, seq, form_id: str, form_srvc_type: str | None, year: int) -> str:
     if not form_id or not form_srvc_type:
-        return _FALLBACK_URL
+        # 폴더형(직접 받을 파일이 없는) 항목 — 노션 URL 중복체크가 걸리지 않도록
+        # pubcode/year를 붙여 항목마다 고유한 링크로 만든다(실제 목적지는 동일 카탈로그 페이지).
+        return f"{_FALLBACK_URL}&pubcode={pubcode}&year={year}"
     ext = ".pdf"
     for ch, e in _EXT_BY_TYPE.items():
         if ch in form_srvc_type:
@@ -98,19 +100,40 @@ def fetch_recent_editions(pubcode: str, min_year: int = MIN_YEAR) -> list[dict]:
         logger.warning("chapList 조회 실패(pubcode=%s): %s", pubcode, e)
         return []
 
+    chap_list = data.get("chapList") or []
+    # chId → 바로 아래 자식들(lvl=0 폴더가 파일이 아닐 때, 자식 파일을 찾기 위한 색인).
+    children_by_up_id: dict[str, list[dict]] = {}
+    for item in chap_list:
+        up_id = item.get("upChId")
+        if up_id is not None:
+            children_by_up_id.setdefault(str(up_id), []).append(item)
+
     editions = []
-    for item in data.get("chapList") or []:
+    for item in chap_list:
         if item.get("lvl") != 0:
             continue  # 연도 단위(lvl=0)만 — 그 아래 분기/표 단위는 너무 잘게 쪼개짐
         kor_name = item.get("korName") or ""
         year = _extract_year(kor_name)
         if year is None or year < min_year:
             continue
+
+        seq, form_id, form_srvc_type = item.get("seq"), item.get("formId"), item.get("formSrvcType")
+        if not form_srvc_type:
+            # 연도 노드가 폴더(직접 받을 파일이 없음) — 바로 밑 자식 중 실제 파일이 있으면 그걸 쓴다.
+            # (예: "초중고 사교육비조사 보고서" 연도 노드 밑에 파일이 자식으로 하나 딸려 있음)
+            child_id = str(item.get("chId"))
+            for child in children_by_up_id.get(child_id, []):
+                if child.get("formSrvcType"):
+                    seq = child.get("seq")
+                    form_id = child.get("formId")
+                    form_srvc_type = child.get("formSrvcType")
+                    break
+
         editions.append({
             "korName": kor_name,
-            "seq": item.get("seq"),
-            "formId": item.get("formId"),
-            "formSrvcType": item.get("formSrvcType"),
+            "seq": seq,
+            "formId": form_id,
+            "formSrvcType": form_srvc_type,
             "year": year,
         })
     return editions
@@ -124,8 +147,12 @@ def collect_recent_publications(min_year: int = MIN_YEAR) -> list[dict]:
         editions = fetch_recent_editions(pub["pubcode"], min_year)
         theme_name = themes.get(pub["theme_code"], "")
         for ed in editions:
-            title = f"{pub['series_name']}_{ed['year']}년"
-            url = _download_url(pub["pubcode"], ed["seq"], ed["formId"], ed["formSrvcType"])
+            # ed["korName"]을 그대로 살린다 — 분기/계절/월 등으로 세분화된 시리즈는 원래
+            # 이름 자체에 그 구분이 들어있어서(예: "SRI 통계플러스 2025년 가을호"), 연도만
+            # 뽑아 "시리즈명_연도" 로 재구성하면 같은 해 여러 호가 전부 같은 제목이 돼버린다.
+            kor_name = ed["korName"]
+            title = kor_name if pub["series_name"] in kor_name else f"{pub['series_name']}_{kor_name}"
+            url = _download_url(pub["pubcode"], ed["seq"], ed["formId"], ed["formSrvcType"], ed["year"])
             rows.append({
                 "title": title,
                 "category": CATEGORY,
