@@ -1,10 +1,11 @@
 """Notion에서 '선정완료' 기사를 가져와 AI 프롬프트용 few-shot 예시를 생성.
 
-독립 실행 스크립트 — 큐레이션이 쌓일 때마다(주 1회 등) 돌려
+run_collect.py가 매 배치(매일 08:00) 끝에 main()을 자동으로 호출해
 prompts/selected_examples.txt 를 최신 상태로 갱신한다.
-core/ai.py가 모듈 로드 시 이 파일을 읽어 분석 프롬프트에 주입한다.
+core/ai.py는 모듈 로드(프로세스 시작) 시점에 이 파일을 한 번만 읽어 분석 프롬프트에
+주입하므로, 갱신 내용은 다음 배치부터 반영된다.
 
-사용법: python -m core.notion_learn
+단독 실행도 가능하다: python -m core.notion_learn
 """
 import config
 from core import notion_client_wrap as notion

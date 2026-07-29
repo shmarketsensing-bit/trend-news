@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 
 import config
-from core import ai, collector, db, dedup, extractor, prefilter, ranker
+from core import ai, collector, db, dedup, extractor, notion_learn, prefilter, ranker
 from core.logger import get_logger
 
 logger = get_logger()
@@ -107,6 +107,15 @@ def run() -> int:
                     res["uploaded"], res["duplicate"], res["failed"])
     else:
         logger.info("노션 키 없음 → 자동 업로드 생략(로컬 SQLite에만 저장)")
+
+    # 담당자가 그동안 '선정완료'로 바꿔둔 기사를 few-shot 학습 예시로 최신화.
+    # core/ai.py는 프로세스 시작 시점에 이 파일을 한 번만 읽으므로, 오늘 갱신한 내용은
+    # 오늘 분석에는 반영 안 되고 다음 배치(내일)부터 반영된다 — 정상 동작이다.
+    if config.NOTION_API_KEY and config.NOTION_DATABASE_ID:
+        try:
+            notion_learn.main()
+        except Exception as e:
+            logger.warning("선정완료 학습 예시 갱신 실패(다음 배치에 다시 시도): %s", e)
 
     logger.info("===== 수집 배치 종료 =====")
     return 0

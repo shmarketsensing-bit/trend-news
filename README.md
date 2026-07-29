@@ -18,7 +18,7 @@ trend-news/
 │   ├── ranker.py          # 최종 후보 선정(카테고리 분산·가중치 정렬)
 │   ├── db.py              # SQLite 저장/캐시
 │   ├── notion_client_wrap.py  # Notion 업로드/조회
-│   ├── notion_learn.py    # (수동) "선정완료" 기사로 few-shot 예시 생성
+│   ├── notion_learn.py    # "선정완료" 기사로 few-shot 예시 생성(매 배치 끝에 자동 실행)
 │   ├── models.py
 │   └── logger.py
 ├── prompts/analyze.txt
@@ -65,10 +65,14 @@ python run_collect.py
 
 업로드된 기사는 노션 DB의 **상태** 컬럼(후보/선정/제외)을 직접 바꿔가며 검토한다.
 
-**(선택) few-shot 학습 갱신**: 담당자가 노션에서 상태를 `config.NOTION_LEARNED_STATUS`
-(기본 "선정완료")로 바꿔둔 기사들을 모아 `prompts/selected_examples.txt`를 다시 만들면, 이후
-Gemini 분석 시 "실제로 우리가 고른 기사" 예시로 참고한다. `run_collect.py`가 자동으로 돌리지
-않으므로, 선정 사례가 어느 정도 쌓였을 때(예: 주 1회) 수동 실행한다.
+**few-shot 학습 갱신(자동)**: 담당자가 노션에서 상태를 `config.NOTION_LEARNED_STATUS`
+(기본 "선정완료")로 바꿔둔 기사들을 `run_collect.py`가 매 배치 끝에 자동으로 모아
+`prompts/selected_examples.txt`를 갱신한다(`core/notion_learn.py`). 이후 Gemini 분석이
+"실제로 우리가 고른 기사" 예시를 참고하게 된다.
+
+`core/ai.py`는 프로세스가 시작될 때 이 파일을 한 번만 읽어 들이므로, **오늘 갱신한 내용은
+오늘 분석에는 반영되지 않고 다음 배치(내일 08:00)부터 반영**된다 — 정상 동작이다. 갱신을
+직접 실행해서 확인하고 싶으면 아래처럼 단독으로 돌릴 수도 있다.
 
 ```bash
 python -m core.notion_learn
